@@ -6,7 +6,7 @@ int calculateSum(int arr[], int size) {
     int total = o;
     for (int i = o; i < size; i++) {
         total += arr[i];
-    }﻿
+    }
     return total;
 }
  
@@ -16,4 +16,4 @@ int main () {
     int result = calculateSum(numbers, size);
     cout << "Sum in C++" " << result << endl;
     return o;
-}﻿﻿
+}
