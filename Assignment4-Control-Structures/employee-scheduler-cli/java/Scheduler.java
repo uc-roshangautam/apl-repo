@@ -2,6 +2,7 @@ import java.util.*;
 
 public class Scheduler {
 
+    // method to collect sample employee data
     public static Map<String, Map<String, List<String>>> collectSampleEmployeeData() {
         Map<String, Map<String, List<String>>> data = new HashMap<>();
 
@@ -98,6 +99,7 @@ public class Scheduler {
         return data;
     }
 
+    // method to collect employee data from user (using Scanner)
     public static Map<String, Map<String, List<String>>> collectEmployeeDataFromUser() {
         Scanner scanner = new Scanner(System.in);
         Map<String, Map<String, List<String>>> data = new HashMap<>();
@@ -129,6 +131,7 @@ public class Scheduler {
         return data;
     }
 
+    // method to initialize schedule with empty shifts
     private static Map<String, Map<String, List<String>>> initializeSchedule() {
         Map<String, Map<String, List<String>>> schedule = new LinkedHashMap<>();
         List<String> days = Arrays.asList(
@@ -146,6 +149,7 @@ public class Scheduler {
         return schedule;
     }
 
+    // method to schedule employees based on their preferences (core logic)
     private static Map<String, Map<String, List<String>>> scheduleEmployees(
             Map<String, Map<String, List<String>>> employeeData) {
 
@@ -239,6 +243,7 @@ public class Scheduler {
         return schedule;
     }
 
+    // utility method to print the final schedule
     private static void printSchedule(Map<String, Map<String, List<String>>> schedule) {
         for (String day : schedule.keySet()) {
             System.out.println("===================================================");
@@ -256,12 +261,13 @@ public class Scheduler {
         }
     }
 
+    // utility method to capitalize the first letter of a string
     private static String capitalize(String str) {
         if (str == null || str.isEmpty()) return str;
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
-    // main driver method: user chooses sample or manual input
+    // main driver method - user chooses sample or manual input
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
