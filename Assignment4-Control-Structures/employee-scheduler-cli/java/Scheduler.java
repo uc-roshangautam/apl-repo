@@ -1,7 +1,8 @@
 import java.util.*;
 
 public class Scheduler {
-    public static Map<String, Map<String, List<String>>> collectEmployeeData() {
+
+    public static Map<String, Map<String, List<String>>> collectSampleEmployeeData() {
         Map<String, Map<String, List<String>>> data = new HashMap<>();
 
         Map<String, List<String>> frankMap = new HashMap<>();
@@ -97,12 +98,41 @@ public class Scheduler {
         return data;
     }
 
+    public static Map<String, Map<String, List<String>>> collectEmployeeDataFromUser() {
+        Scanner scanner = new Scanner(System.in);
+        Map<String, Map<String, List<String>>> data = new HashMap<>();
+
+        System.out.print("How many employees in your company? ");
+        int numEmployees = Integer.parseInt(scanner.nextLine());
+        String[] daysOfWeek = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+
+        for (int i = 0; i < numEmployees; i++) {
+            System.out.println("\nEnter name of employee #" + (i+1) + ": ");
+            String employeeName = scanner.nextLine().trim();
+            Map<String, List<String>> dayPreferences = new HashMap<>();
+            for (String day : daysOfWeek) {
+                System.out.println("Enter preferred shifts for " + employeeName + " on " + day + 
+                                   " (morning/afternoon/evening). Please separate multiple with commas, or skip using Enter:");
+                String input = scanner.nextLine().trim();
+                if (!input.isEmpty()) {
+                    String[] shiftsArray = input.split(",");
+                    List<String> shiftsList = new ArrayList<>();
+                    for (String s : shiftsArray) {
+                        shiftsList.add(s.trim());
+                    }
+                    dayPreferences.put(day, shiftsList);
+                }
+            }
+            data.put(employeeName, dayPreferences);
+        }
+        
+        return data;
+    }
 
     private static Map<String, Map<String, List<String>>> initializeSchedule() {
         Map<String, Map<String, List<String>>> schedule = new LinkedHashMap<>();
         List<String> days = Arrays.asList(
-            "Monday", "Tuesday", "Wednesday", 
-            "Thursday", "Friday", "Saturday", "Sunday"
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
         );
         List<String> shifts = Arrays.asList("morning", "afternoon", "evening");
 
@@ -182,6 +212,7 @@ public class Scheduler {
             }
         }
 
+        // ensure each shift has at least 2 people
         Random rand = new Random();
         for (String day : days) {
             for (String shift : shifts) {
@@ -210,12 +241,14 @@ public class Scheduler {
 
     private static void printSchedule(Map<String, Map<String, List<String>>> schedule) {
         for (String day : schedule.keySet()) {
-            System.out.println("--- " + day + " ---");
+            System.out.println("===================================================");
+            System.out.println("                    " + day);
+            System.out.println("===================================================");
             Map<String, List<String>> shifts = schedule.get(day);
             for (String shift : shifts.keySet()) {
                 List<String> employees = shifts.get(shift);
                 String employeesStr = employees.isEmpty() 
-                    ? "No one assigned" 
+                    ? "N/A" 
                     : String.join(", ", employees);
                 System.out.println("  " + capitalize(shift) + ": " + employeesStr);
             }
@@ -228,9 +261,31 @@ public class Scheduler {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
+    // main driver method: user chooses sample or manual input
     public static void main(String[] args) {
-        Map<String, Map<String, List<String>>> employeeData = collectEmployeeData();
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.println("===================================================");
+        System.out.println("       EMPLOYEE SHIFT SCHEDULER");
+        System.out.println("===================================================");
+        System.out.println("Choose one of the below:");
+        System.out.println("  1) Show sample employee schedule (hardcoded-data)");
+        System.out.println("  2) Input custom employee data");
+
+        System.out.print("Enter choice (1 or 2): ");
+        String choice = scanner.nextLine();
+
+        Map<String, Map<String, List<String>>> employeeData;
+
+        if (choice.equals("1")) {
+            employeeData = collectSampleEmployeeData();
+        } else {
+            employeeData = collectEmployeeDataFromUser();
+        }
+        System.out.println("\nGenerating schedule...");
         Map<String, Map<String, List<String>>> finalSchedule = scheduleEmployees(employeeData);
+
         printSchedule(finalSchedule);
+        scanner.close();
     }
 }

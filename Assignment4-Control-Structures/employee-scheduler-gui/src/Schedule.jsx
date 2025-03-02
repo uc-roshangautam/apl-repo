@@ -115,7 +115,7 @@ function ScheduleDisplay({ schedule }) {
                 <strong>{shift}:</strong>{" "}
                 {schedule[day][shift].length
                   ? schedule[day][shift].join(", ")
-                  : "No one assigned"}
+                  : "N/A"}
               </p>
             ))}
           </Card.Body>
