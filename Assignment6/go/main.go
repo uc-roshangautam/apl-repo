@@ -2,20 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
 )
 
-
 type Task struct {
 	ID             string
 	Data           string
 	ProcessingTime time.Duration
 }
-
 
 type TaskResult struct {
 	TaskID        string
@@ -28,7 +25,6 @@ func (tr TaskResult) String() string {
 	return fmt.Sprintf("TaskResult{taskId='%s', workerId='%s', processedData='%s', processingTime=%s}",
 		tr.TaskID, tr.WorkerID, tr.ProcessedData, tr.ProcessingTime.Format("2006-01-02 15:04:05.000"))
 }
-
 
 type ResultCollector struct {
 	results      []TaskResult
@@ -61,8 +57,8 @@ func (rc *ResultCollector) AddResult(result TaskResult) error {
 	if err != nil {
 		return fmt.Errorf("failed to write result to file: %w", err)
 	}
-	
-	log.Printf("Added result for task: %s processed by worker: %s", result.TaskID, result.WorkerID)
+
+	fmt.Printf("Added result for task: %s processed by worker: %s\n", result.TaskID, result.WorkerID)
 	return nil
 }
 
@@ -74,45 +70,41 @@ func (rc *ResultCollector) PrintSummary() {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	log.Println(".... Results Summary ....")
-	log.Printf("Total tasks processed: %d", len(rc.results))
-	
+	fmt.Println(".... Results Summary ....")
+	fmt.Printf("Total tasks processed: %d\n", len(rc.results))
+
 	for workerID, count := range rc.workerCounts {
-		log.Printf("Worker %s processed %d tasks", workerID, count)
+		fmt.Printf("Worker %s processed %d tasks\n", workerID, count)
 	}
 }
 
 func worker(id string, taskChan <-chan Task, resultCollector *ResultCollector, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Printf("Worker %s started", id)
-	
+	fmt.Printf("Worker %s started\n", id)
+
 	for task := range taskChan {
-		log.Printf("Worker %s processing task: %s", id, task.ID)
-		
-		
+		fmt.Printf("Worker %s processing task: %s\n", id, task.ID)
+
 		time.Sleep(task.ProcessingTime)
-		
-		
+
 		processedData := fmt.Sprintf("Processed by worker %s: %s", id, task.Data)
-		
-		
+
 		result := TaskResult{
 			TaskID:        task.ID,
 			WorkerID:      id,
 			ProcessedData: processedData,
 			ProcessingTime: time.Now(),
 		}
-		
-		
+
 		err := resultCollector.AddResult(result)
 		if err != nil {
-			log.Printf("Error adding result: %v", err)
+			fmt.Printf("Error adding result: %v\n", err)
 		}
-		
-		log.Printf("Worker %s completed task: %s", id, task.ID)
+
+		fmt.Printf("Worker %s completed task: %s\n", id, task.ID)
 	}
-	
-	log.Printf("Worker %s shutting down", id)
+
+	fmt.Printf("Worker %s shutting down\n", id)
 }
 
 func generateTask(id int) Task {
@@ -124,56 +116,46 @@ func generateTask(id int) Task {
 }
 
 func main() {
-	log.Println("Starting Data Processing System")
-	
-	
+	fmt.Println("Starting Data Processing System")
+
 	rand.Seed(time.Now().UnixNano())
-	
-	
+
 	numWorkers := 5
 	numTasks := 20
 	outputFilePath := "results_go.txt"
-	
-	
+
 	resultCollector, err := NewResultCollector(outputFilePath)
 	if err != nil {
-		log.Fatalf("Failed to create result collector: %v", err)
+		fmt.Printf("Failed to create result collector: %v\n", err)
+		return
 	}
 	defer resultCollector.Close()
-	
-	
+
 	taskChan := make(chan Task, numTasks)
-	
-	
+
 	var wg sync.WaitGroup
-	
-	
-	log.Printf("Starting %d workers", numWorkers)
+
+	fmt.Printf("Starting %d workers\n", numWorkers)
 	for i := 0; i < numWorkers; i++ {
 		workerID := fmt.Sprintf("worker-%d", i)
 		wg.Add(1)
 		go worker(workerID, taskChan, resultCollector, &wg)
 	}
-	
-	
-	log.Printf("Adding %d tasks to the queue", numTasks)
+
+	fmt.Printf("Adding %d tasks to the queue\n", numTasks)
 	for i := 0; i < numTasks; i++ {
 		task := generateTask(i)
 		taskChan <- task
-		
-		
+
 		time.Sleep(50 * time.Millisecond)
 	}
-	
-	
-	log.Println("All tasks added, closing task channel")
+
+	fmt.Println("All tasks added, closing task channel")
 	close(taskChan)
-	
-	
-	log.Println("Waiting for workers to finish")
+
+	fmt.Println("Waiting for workers to finish")
 	wg.Wait()
-	
-	
+
 	resultCollector.PrintSummary()
-	log.Println("Data processing system completed")
-} 
+	fmt.Println("Data processing system completed")
+}
