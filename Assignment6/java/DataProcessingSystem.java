@@ -8,254 +8,175 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class DataProcessingSystem {
     private static final Random random = new Random();
     private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-    
+
+    // Task to represent work items
     static class Task {
         private final String id;
         private final String data;
         private final int processingTime;
-        
+
         public Task(String data, int processingTime) {
             this.id = UUID.randomUUID().toString().substring(0, 8);
             this.data = data;
             this.processingTime = processingTime;
         }
-        
+
         public String getId() { return id; }
         public String getData() { return data; }
         public int getProcessingTime() { return processingTime; }
     }
-    
-    
+
+    // Result of processed task
     static class TaskResult {
         private final String taskId;
         private final String workerId;
         private final String processedData;
         private final LocalDateTime processingTime;
-        
+
         public TaskResult(String taskId, String workerId, String processedData) {
             this.taskId = taskId;
             this.workerId = workerId;
             this.processedData = processedData;
             this.processingTime = LocalDateTime.now();
         }
-        
+
         @Override
         public String toString() {
-            return String.format("TaskResult{taskId='%s', workerId='%s', processedData='%s', processingTime=%s}",
-                    taskId, workerId, processedData, processingTime.format(formatter));
+            return String.format(
+                "TaskResult | Task ID: %s | Worker: %s | Time: %s | Output: %s",
+                taskId, workerId, processingTime.format(formatter), processedData
+            );
         }
     }
-    
-    
+
+    // Thread-safe queue
     static class TaskQueue {
         private final Queue<Task> tasks = new LinkedList<>();
         private boolean isShutdown = false;
-        
-        
+
         public synchronized void addTask(Task task) {
             if (isShutdown) {
-                System.out.println("Queue is shutdown, no new tasks");
+                System.out.println("[QUEUE] Queue is shutdown. Cannot add task.");
                 return;
             }
             tasks.add(task);
-            System.out.println("Added task: " + task.getId());
-            this.notifyAll(); 
+            System.out.printf("[QUEUE] Added task: %s\n", task.getId());
+            this.notifyAll();
         }
-        
-        
+
         public synchronized Task getTask() throws InterruptedException {
             while (tasks.isEmpty() && !isShutdown) {
-                wait(); 
+                wait();
             }
-            
             if (tasks.isEmpty() && isShutdown) {
-                return null; 
+                return null;
             }
-            
             Task task = tasks.poll();
             if (task != null) {
-                System.out.println("Retrieved task: " + task.getId());
+                System.out.printf("[QUEUE] Retrieved task: %s\n", task.getId());
             }
             return task;
         }
-        
-        
+
         public synchronized void shutdown() {
             isShutdown = true;
-            notifyAll(); 
-            System.out.println("Task queue shutdown initiated");
+            notifyAll();
+            System.out.println("[QUEUE] Task queue shutdown initiated.");
         }
     }
-    
-    
+
+    // Thread-safe collector
     static class ResultCollector {
         private final List<TaskResult> results = Collections.synchronizedList(new ArrayList<>());
-        private final String outputFilePath;
         private final Map<String, Integer> workerCounts = new ConcurrentHashMap<>();
-        
-        public ResultCollector(String outputFilePath) {
-            this.outputFilePath = outputFilePath;
-            
-            try (FileWriter fw = new FileWriter(outputFilePath, false)) {
-                
-            } catch (IOException e) {
-                System.err.println("Error creating output file: " + e.getMessage());
-            }
-        }
-        
-        
+
         public void addResult(TaskResult result) {
             results.add(result);
             workerCounts.merge(result.workerId, 1, Integer::sum);
-            
-            System.out.println("Added result for task: " + result.taskId + 
-                      " processed by worker: " + result.workerId);
-            
-            
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFilePath, true))) {
-                writer.write(result.toString());
-                writer.newLine();
-            } catch (IOException e) {
-                System.err.println("[ERROR] Error writing result to file: " + e.getMessage());
-            }
+            System.out.printf("[RESULT] Task %s processed by %s\n", result.taskId, result.workerId);
         }
-        
-        
+
         public void printSummary() {
-            System.out.println("....... Results Summary .......");
-            System.out.println("Total tasks processed: " + results.size());
-            
-            for (Map.Entry<String, Integer> entry : workerCounts.entrySet()) {
-                System.out.println("Worker " + entry.getKey() + " processed " + entry.getValue() + " tasks");
-            }
+            System.out.println("\n....... Results Summary .......");
+            System.out.printf("Total tasks processed: %d\n", results.size());
+            workerCounts.forEach((worker, count) ->
+                System.out.printf("Worker %-10s processed %d task(s)\n", worker, count)
+            );
+            System.out.println("Data processing completed.");
         }
     }
-    
-    
-    static class Worker implements Runnable {
-        private final String id;
+
+    // Worker class to process tasks
+    static class Worker extends Thread {
+        private final String workerId;
         private final TaskQueue taskQueue;
         private final ResultCollector resultCollector;
-        private final AtomicBoolean running = new AtomicBoolean(true);
-        
-        public Worker(String id, TaskQueue taskQueue, ResultCollector resultCollector) {
-            this.id = id;
+        private final AtomicBoolean isRunning = new AtomicBoolean(true);
+
+        public Worker(String workerId, TaskQueue taskQueue, ResultCollector resultCollector) {
+            this.workerId = workerId;
             this.taskQueue = taskQueue;
             this.resultCollector = resultCollector;
         }
-        
+
         @Override
         public void run() {
-            System.out.println("Worker " + id + " started");
-            
-            try {
-                while (running.get()) {
-                    Task task = null;
-                    try {
-                        task = taskQueue.getTask();
-                        
-                        if (task == null) {
-                            System.out.println("Worker " + id + " received null task, shutting down");
-                            break;
-                        }
-                        
-                        
-                        String processedData = processTask(task);
-                        
-                        
-                        TaskResult result = new TaskResult(task.getId(), id, processedData);
-                        resultCollector.addResult(result);
-                        
-                    } catch (InterruptedException e) {
-                        System.out.println("Worker " + id + " was interrupted: " + e.getMessage());
-                        Thread.currentThread().interrupt();
+            System.out.printf("[WORKER-%s] Started\n", workerId);
+            while (isRunning.get()) {
+                try {
+                    Task task = taskQueue.getTask();
+                    if (task == null) {
+                        isRunning.set(false);
+                        System.out.printf("[WORKER-%s] No more tasks. Shutting down...\n", workerId);
                         break;
-                    } catch (Exception e) {
-                        System.err.println("Worker " + id + " encountered an error processing task: " + e.getMessage());
                     }
+
+                    System.out.printf("[WORKER-%s] Processing task: %s\n", workerId, task.getId());
+                    Thread.sleep(task.getProcessingTime());
+                    String processedData = task.getData().toUpperCase();
+                    TaskResult result = new TaskResult(task.getId(), workerId, processedData);
+                    resultCollector.addResult(result);
+
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    System.out.printf("[WORKER-%s] Interrupted. Exiting...\n", workerId);
+                    break;
                 }
-            } finally {
-                System.out.println("Worker " + id + " is shutting down");
             }
-        }
-        
-        private String processTask(Task task) throws InterruptedException {
-            System.out.println("Worker " + id + " processing task: " + task.getId());
-            
-            try {
-                
-                Thread.sleep(task.getProcessingTime());
-                
-                
-                String processedData = "Processed by worker " + id + ": " + task.getData().toUpperCase();
-                System.out.println("Worker " + id + " completed task: " + task.getId());
-                
-                return processedData;
-            } catch (InterruptedException e) {
-                System.out.println("Worker " + id + " was interrupted while processing task: " + task.getId());
-                throw e;
-            }
+            System.out.printf("[WORKER-%s] Shutdown complete.\n", workerId);
         }
     }
-    
-    public static void main(String[] args) {
-        
+
+    // Main execution
+    public static void main(String[] args) throws InterruptedException {
         int numWorkers = 4;
         int numTasks = 20;
-        String outputFilePath = "results.txt";
-        
-        
+
         TaskQueue taskQueue = new TaskQueue();
-        ResultCollector resultCollector = new ResultCollector(outputFilePath);
-        
-        
-        ExecutorService executorService = Executors.newFixedThreadPool(numWorkers);
+        ResultCollector resultCollector = new ResultCollector();
         List<Worker> workers = new ArrayList<>();
-        
-        System.out.println("Starting " + numWorkers + " workers");
+
+        System.out.printf("[MAIN] Starting %d workers...\n", numWorkers);
         for (int i = 0; i < numWorkers; i++) {
             Worker worker = new Worker("worker-" + i, taskQueue, resultCollector);
+            worker.start();
             workers.add(worker);
-            executorService.submit(worker);
         }
-        
-        
-        System.out.println("Adding " + numTasks + " tasks to the queue");
-        try {
-            for (int i = 0; i < numTasks; i++) {
-                
-                int processingTime = 100 + random.nextInt(900);
-                Task task = new Task("Task data " + i, processingTime);
-                taskQueue.addTask(task);
-                
-                
-                Thread.sleep(50);
-            }
-        } catch (InterruptedException e) {
-            System.err.println("Main thread interrupted while adding tasks: " + e.getMessage());
-            Thread.currentThread().interrupt();
+
+        System.out.printf("[MAIN] Adding %d tasks to the queue...\n", numTasks);
+        for (int i = 0; i < numTasks; i++) {
+            String data = "data-" + (i + 1);
+            int delay = 200 + random.nextInt(300);
+            taskQueue.addTask(new Task(data, delay));
         }
-        
-        
-        System.out.println("All tasks added, initiating shutdown");
+
+        System.out.println("[MAIN] All tasks added. Initiating shutdown...");
         taskQueue.shutdown();
-        
-        
-        try {
-            
-            executorService.shutdown();
-            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
-                System.out.println("Not all tasks completed in time, forcing shutdown");
-                executorService.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            System.err.println("Main thread was interrupted while waiting for workers to finish: " + e.getMessage());
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
+
+        for (Worker worker : workers) {
+            worker.join();
         }
-        
-        
+
         resultCollector.printSummary();
-        System.out.println("Data processing completed");
     }
-} 
+}
