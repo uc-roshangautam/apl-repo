@@ -91,7 +91,7 @@ public class DataProcessingSystem {
         private final Map<String, Integer> workerCounts = new ConcurrentHashMap<>();
 
         public void addResult(TaskResult result) {
-            results.add(result);
+            results.add(result);      
             workerCounts.merge(result.workerId, 1, Integer::sum);
             System.out.printf("[RESULT] Task %s processed by %s\n", result.taskId, result.workerId);
         }
